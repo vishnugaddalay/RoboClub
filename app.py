@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget, QHBoxLayout, QPushButton 
-import cv2
 from PyQt6.QtGui import *
 from PyQt6.QtCore import QTimer, Qt, QSize
+import cv2
 import sys
 import time
 
@@ -11,11 +11,14 @@ class Camera(QLabel):
         self.capture = cv2.VideoCapture(0)
         if not self.capture.isOpened():
             exit()
+        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH,1920)
+        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT,1080)
+
         self.tim = QTimer(self)
         self.tim.timeout.connect(self.update_frame)
         self.tim.start(30)
-        self.setScaledContents(True)
         self.update_frame()
+        self.setMinimumSize(200,200)
 
     def update_frame(self):
         ret, frame = self.capture.read()
@@ -52,7 +55,6 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(QSize(1280,720))
         cam_w = int(self.width() * 0.9)
         cam_h = int(cam_w*9/16)
-        print(self.size())
 
     def resizeEvent(self, event):
         cam_w = int(self.width() * 0.9)
