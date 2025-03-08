@@ -43,18 +43,20 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Camera")
+        self.setMinimumSize(800,480)
+
         self.cam = Camera()
-        main_layout = QVBoxLayout()
-        left_layout = QHBoxLayout()
-        left_layout.addWidget(self.cam)
-        left_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.cap_picture = QPushButton("Capture Picture")
+        self.cap_picture.clicked.connect(self.cam.capturePicture)
+        self.cap_picture.setFixedSize(100,100)
+        main_layout = QHBoxLayout()
+        buttons = QHBoxLayout()
+        main_layout.addWidget(self.cam)
+        buttons.addWidget(self.cap_picture)
+        main_layout.addLayout(buttons)
         self.container = QWidget()
         self.container.setLayout(main_layout)
-        main_layout.addLayout(left_layout)
         self.setCentralWidget(self.container)
-        self.setMinimumSize(QSize(1280,720))
-        cam_w = int(self.width() * 0.9)
-        cam_h = int(cam_w*9/16)
 
     def resizeEvent(self, event):
         cam_w = int(self.width() * 0.9)
