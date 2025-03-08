@@ -19,6 +19,11 @@ class Camera(QLabel):
         self.tim.start(30)
         self.update_frame()
         self.setMinimumSize(200,200)
+        self.record_timer=QTimer(self)
+        self.record_timer.timeout.connect(self.record_frame)
+        self.recording = False
+        self.video_writer = None
+        self.setMinimumSize(200, 200)
 
     def update_frame(self):
         ret, frame = self.capture.read()
@@ -34,6 +39,27 @@ class Camera(QLabel):
             ret, frame = self.capture.read()
             cv2.imwrite(f"{int(time.time())}.png", frame)
 
+    def start_recording(self):
+        if not self.recording:
+            self.recording = True
+            fourcc = cv2.VideoWriter_fourcc(*'XVID')
+            self.video_writer = cv2.VideoWriter(f"{int(time.time())}.avi", fourcc, 15.0, (1920, 1080))
+            self.record_timer.start(int(1000/15))
+
+    def record_frame(self):
+        if self.recording:
+            ret, frame = self.capture.read()
+            if ret:
+                self.video_writer.write(frame)
+
+    def stop_recording(self):
+        if self.recording:
+            self.recording = False
+            self.record_timer.stop()
+            if self.video_writer:
+                self.video_writer.release()
+                self.video_writer = None
+
 
     def closeEvent(self, event):
         self.capture.release()
@@ -47,11 +73,16 @@ class MainWindow(QMainWindow):
 
         self.cam = Camera()
         self.cap_picture = QPushButton("Capture Picture")
+        self.record = QPushButton("Start Recording")
+        self.record.setCheckable(True)
+        self.record.setFixedSize(100,100)
+        self.record.clicked.connect(self.record_func)
         self.cap_picture.clicked.connect(self.cam.capturePicture)
         self.cap_picture.setFixedSize(100,100)
         main_layout = QHBoxLayout()
-        buttons = QHBoxLayout()
+        buttons = QVBoxLayout()
         main_layout.addWidget(self.cam)
+        buttons.addWidget(self.record)
         buttons.addWidget(self.cap_picture)
         main_layout.addLayout(buttons)
         self.container = QWidget()
@@ -62,6 +93,14 @@ class MainWindow(QMainWindow):
         cam_w = int(self.width() * 0.9)
         cam_h = int(cam_w*9/16)
         self.cam.resize(cam_w, cam_h)
+    def record_func(self):
+        if self.record.isChecked():
+            self.record.setText("Stop Recording")
+            self.cam.start_recording()
+        else:
+            self.record.setText("Start Recording")
+            self.cam.stop_recording()
+
 
 app = QApplication(sys.argv)
 window = MainWindow()
