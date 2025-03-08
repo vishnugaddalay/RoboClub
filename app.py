@@ -29,12 +29,12 @@ class Camera(QLabel):
         ret, frame = self.capture.read()
         if ret:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame = cv2.resize(frame, (self.width(),self.height()))
-
             h, w, ch = frame.shape
             bytes_per_line = ch * w
             q_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
-            self.setPixmap(QPixmap.fromImage(q_image))
+            pixmap = QPixmap.fromImage(q_image)
+            scaled_pixmap = pixmap.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self.setPixmap(scaled_pixmap)
     def capturePicture(self):
             ret, frame = self.capture.read()
             cv2.imwrite(f"{int(time.time())}.png", frame)
@@ -68,23 +68,28 @@ class Camera(QLabel):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+
         self.setWindowTitle("Camera")
         self.setMinimumSize(800,480)
 
         self.cam = Camera()
-        self.cap_picture = QPushButton("Capture Picture")
         self.record = QPushButton("Start Recording")
+        self.cap_picture = QPushButton("Capture Picture")
+
         self.record.setCheckable(True)
         self.record.setFixedSize(100,100)
         self.record.clicked.connect(self.record_func)
-        self.cap_picture.clicked.connect(self.cam.capturePicture)
         self.cap_picture.setFixedSize(100,100)
+        self.cap_picture.clicked.connect(self.cam.capturePicture)
+
         main_layout = QHBoxLayout()
         buttons = QVBoxLayout()
-        main_layout.addWidget(self.cam)
+
         buttons.addWidget(self.record)
         buttons.addWidget(self.cap_picture)
+        main_layout.addWidget(self.cam)
         main_layout.addLayout(buttons)
+
         self.container = QWidget()
         self.container.setLayout(main_layout)
         self.setCentralWidget(self.container)
