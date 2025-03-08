@@ -24,10 +24,20 @@ class Camera(QLabel):
         self.recording = False
         self.video_writer = None
         self.setMinimumSize(200, 200)
+    def drawBoxes(self,ret,frame):
+        if ret:
+            gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+            face = face_classifier.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(40, 40))
+            for (x, y, w, h) in face:
+                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 4)
+            return frame
+
 
     def update_frame(self):
         ret, frame = self.capture.read()
         if ret:
+            frame=self.drawBoxes(ret,frame)
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             h, w, ch = frame.shape
             bytes_per_line = ch * w
@@ -36,8 +46,12 @@ class Camera(QLabel):
             scaled_pixmap = pixmap.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             self.setPixmap(scaled_pixmap)
     def capturePicture(self):
-            ret, frame = self.capture.read()
-            cv2.imwrite(f"{int(time.time())}.png", frame)
+        ret, frame = self.capture.read()
+        frame=self.drawBoxes(ret,frame)
+
+        if ret:
+            filename = f"{int(time.time())}.png"
+            cv2.imwrite(filename, frame)
 
     def start_recording(self):
         if not self.recording:
@@ -49,6 +63,8 @@ class Camera(QLabel):
     def record_frame(self):
         if self.recording:
             ret, frame = self.capture.read()
+            frame=self.drawBoxes(ret,frame)
+
             if ret:
                 self.video_writer.write(frame)
 
