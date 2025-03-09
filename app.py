@@ -1,54 +1,75 @@
-from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget, QHBoxLayout, QPushButton 
-from PyQt6.QtGui import *
+from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QWidget, QHBoxLayout, QPushButton, QSizePolicy
+from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtCore import QTimer, Qt, QSize
 import cv2
 import sys
 import time
 
+
 class Camera(QLabel):
     def __init__(self):
         super().__init__()
-        self.capture = cv2.VideoCapture(0)
-        if not self.capture.isOpened():
-            exit()
-        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH,1920)
-        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT,1080)
-
-        self.tim = QTimer(self)
-        self.tim.timeout.connect(self.update_frame)
-        self.tim.start(30)
-        self.update_frame()
-        self.setMinimumSize(200,200)
-        self.record_timer=QTimer(self)
-        self.record_timer.timeout.connect(self.record_frame)
+        
         self.recording = False
         self.video_writer = None
+        self.capture = cv2.VideoCapture(0)
+        
+        if not self.capture.isOpened():
+            exit()
+        
+        self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_frame)
+        self.timer.start(20)
+        
         self.setMinimumSize(200, 200)
-    def drawBoxes(self,ret,frame):
-        if ret:
-            gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-            face = face_classifier.detectMultiScale(gray_image, scaleFactor=1.1, minNeighbors=5, minSize=(40, 40))
-            for (x, y, w, h) in face:
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 4)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.setScaledContents(True)
+        
+        self.count = 0
+        self.face = None
+
+    def draw_boxes(self, ret, frame):
+        self.count += 1 
+        
+        if self.count % 5 != 0:  # Only detect faces every 5 frames
             return frame
 
+        if ret:
+            gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            small_gray = cv2.resize(gray_image, (0, 0), fx=0.5, fy=0.5) 
+            face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+            self.face = face_classifier.detectMultiScale(small_gray, scaleFactor=1.1, minNeighbors=5, minSize=(20, 20))
+        
+        return frame
 
     def update_frame(self):
         ret, frame = self.capture.read()
+        
         if ret:
-            frame=self.drawBoxes(ret,frame)
+            frame = self.draw_boxes(ret, frame)
+            
+            if self.face is not None:
+                for (x, y, w, h) in self.face:
+                    cv2.rectangle(frame, (2*x, 2*y), (2*(x + w), 2*(y + h)), (0, 255, 0), 2)
+            
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             h, w, ch = frame.shape
             bytes_per_line = ch * w
             q_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+            
+            if self.recording:
+                self.video_writer.write(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+            
             pixmap = QPixmap.fromImage(q_image)
-            scaled_pixmap = pixmap.scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            self.setPixmap(scaled_pixmap)
-    def capturePicture(self):
-        ret, frame = self.capture.read()
-        frame=self.drawBoxes(ret,frame)
+            self.setPixmap(pixmap)
 
+    def capture_picture(self):
+        ret, frame = self.capture.read()
+        frame = self.draw_boxes(ret, frame)
+        
         if ret:
             filename = f"{int(time.time())}.png"
             cv2.imwrite(filename, frame)
@@ -57,69 +78,72 @@ class Camera(QLabel):
         if not self.recording:
             self.recording = True
             fourcc = cv2.VideoWriter_fourcc(*'XVID')
-            self.video_writer = cv2.VideoWriter(f"{int(time.time())}.avi", fourcc, 15.0, (1920, 1080))
-            self.record_timer.start(int(1000/15))
-
-    def record_frame(self):
-        if self.recording:
-            ret, frame = self.capture.read()
-            frame=self.drawBoxes(ret,frame)
-
-            if ret:
-                self.video_writer.write(frame)
+            self.video_writer = cv2.VideoWriter(f"{int(time.time())}.avi", fourcc, 20.0, (1280, 720))
 
     def stop_recording(self):
         if self.recording:
             self.recording = False
-            self.record_timer.stop()
             if self.video_writer:
                 self.video_writer.release()
                 self.video_writer = None
 
-
     def closeEvent(self, event):
         self.capture.release()
         event.accept()
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
         self.setWindowTitle("Camera")
-        self.setMinimumSize(800,480)
+        self.setMinimumSize(800, 480)
 
         self.cam = Camera()
-        self.record = QPushButton("Start Recording")
-        self.cap_picture = QPushButton("Capture Picture")
+        self.record_button = QPushButton("Start Recording")
+        self.capture_button = QPushButton("Capture Picture")
 
-        self.record.setCheckable(True)
-        self.record.setFixedSize(100,100)
-        self.record.clicked.connect(self.record_func)
-        self.cap_picture.setFixedSize(100,100)
-        self.cap_picture.clicked.connect(self.cam.capturePicture)
+        self.record_button.setCheckable(True)
+        self.record_button.setFixedSize(100, 100)
+        self.record_button.clicked.connect(self.toggle_recording)
+
+        self.capture_button.setFixedSize(100, 100)
+        self.capture_button.clicked.connect(self.cam.capture_picture)
 
         main_layout = QHBoxLayout()
-        buttons = QVBoxLayout()
+        button_layout = QVBoxLayout()
 
-        buttons.addWidget(self.record)
-        buttons.addWidget(self.cap_picture)
+        button_layout.addWidget(self.record_button)
+        button_layout.addWidget(self.capture_button)
+        
         main_layout.addWidget(self.cam)
-        main_layout.addLayout(buttons)
+        main_layout.addLayout(button_layout)
 
         self.container = QWidget()
         self.container.setLayout(main_layout)
         self.setCentralWidget(self.container)
 
     def resizeEvent(self, event):
-        cam_w = int(self.width() * 0.9)
-        cam_h = int(cam_w*9/16)
-        self.cam.resize(cam_w, cam_h)
-    def record_func(self):
-        if self.record.isChecked():
-            self.record.setText("Stop Recording")
+        max_width = self.width() - 150 
+        max_height = self.height() - 100  
+        
+        cam_w = max_width
+        cam_h = int(cam_w * 9 / 16)
+        
+        if cam_h > max_height:
+            cam_h = max_height
+            cam_w = int(cam_h * 16 / 9)
+
+        self.cam.setFixedSize(cam_w, cam_h)
+        
+        super().resizeEvent(event)
+
+    def toggle_recording(self):
+        if self.record_button.isChecked():
+            self.record_button.setText("Stop Recording")
             self.cam.start_recording()
         else:
-            self.record.setText("Start Recording")
+            self.record_button.setText("Start Recording")
             self.cam.stop_recording()
 
 
@@ -127,4 +151,3 @@ app = QApplication(sys.argv)
 window = MainWindow()
 window.show()
 app.exec()
-
