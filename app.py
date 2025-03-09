@@ -15,7 +15,7 @@ class Camera(QLabel):
         self.capture = cv2.VideoCapture(0)
         
         if not self.capture.isOpened():
-            exit()
+            raise RuntimeError("Failed to open camera.")
         
         self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
@@ -29,7 +29,7 @@ class Camera(QLabel):
         self.setScaledContents(True)
         
         self.count = 0
-        self.face = None
+        self.face = []
 
     def draw_boxes(self, ret, frame):
         self.count += 1 
@@ -54,14 +54,14 @@ class Camera(QLabel):
             if self.face is not None:
                 for (x, y, w, h) in self.face:
                     cv2.rectangle(frame, (2*x, 2*y), (2*(x + w), 2*(y + h)), (0, 255, 0), 2)
+            if self.recording:
+                self.video_writer.write(frame)
             
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             h, w, ch = frame.shape
             bytes_per_line = ch * w
             q_image = QImage(frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
             
-            if self.recording:
-                self.video_writer.write(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
             
             pixmap = QPixmap.fromImage(q_image)
             self.setPixmap(pixmap)
@@ -87,9 +87,12 @@ class Camera(QLabel):
                 self.video_writer.release()
                 self.video_writer = None
 
-    def closeEvent(self, event):
-        self.capture.release()
-        event.accept()
+    def close(self):
+        if self.recording:
+            self.stop_recording()
+        self.timer.stop()
+        if self.capture.isOpened():
+            self.capture.release()
 
 
 class MainWindow(QMainWindow):
@@ -145,6 +148,11 @@ class MainWindow(QMainWindow):
         else:
             self.record_button.setText("Start Recording")
             self.cam.stop_recording()
+
+    def closeEvent(self, event):
+        self.cam.close()
+        event.accept()
+
 
 
 app = QApplication(sys.argv)
