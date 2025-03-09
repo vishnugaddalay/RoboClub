@@ -82,7 +82,7 @@ class Camera(QLabel):
             elif self.cap:
                 filename = f"{int(time.time())}.png"
                 cv2.imwrite(filename, frame)
-                print(frame.size)
+                print("Successfully Caputred Picture!")
                 self.cap = False
 
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -110,6 +110,7 @@ class Camera(QLabel):
             )
 
     def stop_recording(self):
+        print("Successfully Recorded Video!")
         if self.recording:
             self.recording = False
             if self.video_writer:
