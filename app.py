@@ -11,6 +11,7 @@ class Camera(QLabel):
         super().__init__()
         
         self.recording = False
+        self.cap=False
         self.video_writer = None
         self.capture = cv2.VideoCapture(0)
         
@@ -30,6 +31,7 @@ class Camera(QLabel):
         
         self.count = 0
         self.face = []
+        self.face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
 
     def draw_boxes(self, ret, frame):
         self.count += 1 
@@ -40,8 +42,7 @@ class Camera(QLabel):
         if ret:
             gray_image = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             small_gray = cv2.resize(gray_image, (0, 0), fx=0.5, fy=0.5) 
-            face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-            self.face = face_classifier.detectMultiScale(small_gray, scaleFactor=1.1, minNeighbors=5, minSize=(20, 20))
+            self.face = self.face_classifier.detectMultiScale(small_gray, scaleFactor=1.1, minNeighbors=5, minSize=(20, 20))
         
         return frame
 
@@ -53,10 +54,15 @@ class Camera(QLabel):
             
             if self.face is not None:
                 for (x, y, w, h) in self.face:
-                    cv2.rectangle(frame, (2*x, 2*y), (2*(x + w), 2*(y + h)), (0, 255, 0), 2)
+                    x,y,w,h=2*x,2*y,2*w,2*h # Did facial recognition on a scaled down version of frame
+                    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
             if self.recording:
                 self.video_writer.write(frame)
-            
+            elif self.cap:
+                filename = f"{int(time.time())}.png"
+                cv2.imwrite(filename, frame)
+                self.cap=False
+
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             h, w, ch = frame.shape
             bytes_per_line = ch * w
@@ -67,12 +73,7 @@ class Camera(QLabel):
             self.setPixmap(pixmap)
 
     def capture_picture(self):
-        ret, frame = self.capture.read()
-        frame = self.draw_boxes(ret, frame)
-        
-        if ret:
-            filename = f"{int(time.time())}.png"
-            cv2.imwrite(filename, frame)
+        self.cap=True
 
     def start_recording(self):
         if not self.recording:
